@@ -9,7 +9,7 @@ import * as tea from "./tea"
 import * as pb from "./protobuf"
 import * as jce from "./jce"
 import {BUF0, BUF4, BUF16, NOOP, md5, timestamp, lock, hide, unzip, int32ip2str} from "./constants"
-import {ShortDevice, Device, generateFullDevice, Platform, Apk, getApkInfo} from "./device"
+import {ShortDevice, Device, Platform, Apk, getApkInfo} from "./device"
 import * as log4js from "log4js";
 import {log} from "../common";
 
@@ -157,7 +157,7 @@ export class BaseClient extends Trapper {
     constructor(p: Platform = Platform.Android, d?: ShortDevice) {
         super()
         this.apk = getApkInfo(p)
-        this.device = generateFullDevice(d)
+        this.device = new Device(this.apk,d)
         this[NET].on("error", err => this.trip("internal.verbose", err.message, VerboseLevel.Error))
         this[NET].on("close", () => {
             this.statistics.remote_ip = ""
@@ -294,10 +294,10 @@ export class BaseClient extends Trapper {
             .writeBytes(t(0x202)) // should have been removed
             .writeBytes(t(0x177))
             .writeBytes(t(0x516))
-            .writeBytes(t(0x521))
+            .writeBytes(t(0x521,0))
             .writeBytes(t(0x525))
             .writeBytes(t(0x544)) // TODO: native t544
-            //.writeBytes(t(0x545)) // TODO: qimei
+            .writeBytes(t(0x545,this.device.qImei16||this.device.imei))
             //.writeBytes(t(0x548)) // TODO: PoW test data
             .writeBytes(t(0x542))
             .read()
@@ -370,7 +370,7 @@ export class BaseClient extends Trapper {
             .writeBytes(t(0x1D))
             .writeBytes(t(0x1F))
             .writeBytes(t(0x33))
-            .writeBytes(t(0x35))
+            .writeBytes(t(0x35,3))
             .read()
         const pkt = buildCode2dPacket.call(this, 0x31, 0x11100, body)
         this[FN_SEND](pkt).then(payload => {
@@ -427,7 +427,7 @@ export class BaseClient extends Trapper {
                 .writeBytes(t(0x202))
                 .writeBytes(t(0x177))
                 .writeBytes(t(0x516))
-                .writeBytes(t(0x521))
+                .writeBytes(t(0x521,8))
                 .writeU16(0x318)
                 .writeTlv(t318)
                 .read()
@@ -978,6 +978,7 @@ function decodeT119(this: BaseClient, t119: Buffer) {
     this.sig.t103 = t[0x103] ? t[0x103] : this.sig.t103
     this.sig.skey = t[0x120] ? t[0x120] : this.sig.skey
     this.sig.d2 = t[0x143] ? t[0x143] : this.sig.d2
+    this.sig.skid=t[0x108]?t[0x108]:undefined
     this.sig.d2key = t[0x305] ? t[0x305] : this.sig.d2key
     this.sig.sig_key =  t[0x133] ? t[0x133] : this.sig.sig_key
     this.sig.ticket_key= t[0x134] ? t[0x134] : this.sig.ticket_key
